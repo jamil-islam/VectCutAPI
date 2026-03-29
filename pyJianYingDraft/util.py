@@ -2,7 +2,7 @@
 
 import inspect
 
-from typing import Union, Type
+from typing import Union, Type, get_type_hints
 from typing import List, Dict, Any
 
 JsonExportable = Union[int, float, bool, str, List["JsonExportable"], Dict[str, "JsonExportable"]]
@@ -33,10 +33,9 @@ def assign_attr_with_json(obj: object, attrs: List[str], json_data: Dict[str, An
 
     若有复杂类型，则尝试调用其`import_json`方法进行构造
     """
-    type_hints: Dict[str, Type] = {}
-    for cls in obj.__class__.__mro__:
-        if '__annotations__' in cls.__dict__:
-            type_hints.update(cls.__annotations__)
+    # Python 3.14 may not populate class __annotations__ eagerly for this code path.
+    # Resolve hints through typing.get_type_hints so template loading remains stable.
+    type_hints: Dict[str, Type] = get_type_hints(obj.__class__)
 
     for attr in attrs:
         if hasattr(type_hints[attr], 'import_json'):

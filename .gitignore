@@ -10,8 +10,11 @@ dist/
 .DS_Store
 
 config.json
+config.json.local
 ./resource
 
 .venv/
 venv/
 tmp/
+
+notes.md

@@ -82,18 +82,19 @@ def save_draft_background(draft_id, draft_folder, task_id):
         update_tasks_cache(task_id, task_status)  # Use new cache management function
         logger.info(f"Task {task_id} status updated to 'processing': Preparing draft files.")
         
-        # Delete possibly existing draft_id folder
-        if os.path.exists(draft_id):
-            logger.warning(f"Deleting existing draft folder (current working directory): {draft_id}")
-            shutil.rmtree(draft_id)
-
-        logger.info(f"Starting to save draft: {draft_id}")
-        # Save draft
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        draft_folder_for_duplicate = draft.Draft_folder(current_dir)
-        # Choose different template directory based on configuration
         template_dir = "template" if IS_CAPCUT_ENV else "template_jianying"
-        draft_folder_for_duplicate.duplicate_as_template(template_dir, draft_id)
+        output_root = draft_folder or current_dir
+        target_draft_path = os.path.join(output_root, draft_id)
+
+        os.makedirs(output_root, exist_ok=True)
+
+        if os.path.exists(target_draft_path):
+            logger.warning(f"Deleting existing draft folder: {target_draft_path}")
+            shutil.rmtree(target_draft_path)
+
+        logger.info(f"Starting to save draft: {draft_id} to {target_draft_path}")
+        shutil.copytree(os.path.join(current_dir, template_dir), target_draft_path)
         
         # Update task status
         update_task_field(task_id, "message", "Updating media file metadata")
@@ -120,7 +121,7 @@ def save_draft_background(draft_id, draft_folder, task_id):
                 download_tasks.append({
                     'type': 'audio',
                     'func': download_file,
-                    'args': (remote_url, os.path.join(current_dir, f"{draft_id}/assets/audio/{material_name}")),
+                    'args': (remote_url, os.path.join(target_draft_path, "assets", "audio", material_name)),
                     'material': audio
                 })
         
@@ -143,7 +144,7 @@ def save_draft_background(draft_id, draft_folder, task_id):
                     download_tasks.append({
                         'type': 'image',
                         'func': download_file,
-                        'args': (remote_url, os.path.join(current_dir, f"{draft_id}/assets/image/{material_name}")),
+                        'args': (remote_url, os.path.join(target_draft_path, "assets", "image", material_name)),
                         'material': video
                     })
                 
@@ -159,7 +160,7 @@ def save_draft_background(draft_id, draft_folder, task_id):
                     download_tasks.append({
                         'type': 'video',
                         'func': download_file,
-                        'args': (remote_url, os.path.join(current_dir, f"{draft_id}/assets/video/{material_name}")),
+                        'args': (remote_url, os.path.join(target_draft_path, "assets", "video", material_name)),
                         'material': video
                     })
 
@@ -212,8 +213,8 @@ def save_draft_background(draft_id, draft_folder, task_id):
         update_task_field(task_id, "message", "Saving draft information")
         logger.info(f"Task {task_id} progress 70%: Saving draft information.")
         
-        script.dump(os.path.join(current_dir, f"{draft_id}/draft_info.json"))
-        logger.info(f"Draft information has been saved to {os.path.join(current_dir, draft_id)}/draft_info.json.")
+        script.dump(os.path.join(target_draft_path, "draft_info.json"))
+        logger.info(f"Draft information has been saved to {os.path.join(target_draft_path, 'draft_info.json')}.")
 
         draft_url = ""
         # Only upload draft information when IS_UPLOAD_DRAFT is True

@@ -5,9 +5,49 @@ set -euo pipefail
 SERVER_URL="${SERVER_URL:-http://localhost:9001}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 VIDEO_DIR="${VIDEO_DIR:-$SCRIPT_DIR/videos}"
+CAPTIONS_SRT_PATH="${CAPTIONS_SRT_PATH:-$SCRIPT_DIR/captions.srt}"
 USER_HOME="${HOME:-$(python3 -c 'from pathlib import Path; print(Path.home())')}"
 CAPCUT_DRAFT_ROOT="${CAPCUT_DRAFT_ROOT:-$USER_HOME/Movies/CapCut/User Data/Projects/com.lveditor.draft}"
 TRACK_NAME="${TRACK_NAME:-video_main}"
+AUTO_CAPTIONS="${AUTO_CAPTIONS:-false}"
+OPENAI_TRANSCRIBE_MODEL="${OPENAI_TRANSCRIBE_MODEL:-whisper-1}"
+OPENAI_TRANSCRIBE_LANGUAGE="${OPENAI_TRANSCRIBE_LANGUAGE:-}"
+OPENAI_TRANSCRIBE_PROMPT="${OPENAI_TRANSCRIBE_PROMPT:-}"
+SUBTITLE_TRACK_NAME="${SUBTITLE_TRACK_NAME:-subtitle}"
+SUBTITLE_PRESET="${SUBTITLE_PRESET:-circuit_electric}"
+
+SUBTITLE_FONT="${SUBTITLE_FONT:-}"
+SUBTITLE_FONT_SIZE="${SUBTITLE_FONT_SIZE:-10.0}"
+SUBTITLE_BOLD="${SUBTITLE_BOLD:-false}"
+SUBTITLE_ITALIC="${SUBTITLE_ITALIC:-false}"
+SUBTITLE_UNDERLINE="${SUBTITLE_UNDERLINE:-false}"
+SUBTITLE_FONT_COLOR="${SUBTITLE_FONT_COLOR:-#FFFFFF}"
+SUBTITLE_ALPHA="${SUBTITLE_ALPHA:-1.0}"
+SUBTITLE_VERTICAL="${SUBTITLE_VERTICAL:-false}"
+SUBTITLE_BORDER_COLOR="${SUBTITLE_BORDER_COLOR:-#000000}"
+SUBTITLE_BORDER_WIDTH="${SUBTITLE_BORDER_WIDTH:-0.08}"
+SUBTITLE_BORDER_ALPHA="${SUBTITLE_BORDER_ALPHA:-1.0}"
+SUBTITLE_BACKGROUND_COLOR="${SUBTITLE_BACKGROUND_COLOR:-#000000}"
+SUBTITLE_BACKGROUND_STYLE="${SUBTITLE_BACKGROUND_STYLE:-1}"
+SUBTITLE_BACKGROUND_ALPHA="${SUBTITLE_BACKGROUND_ALPHA:-1.0}"
+SUBTITLE_TRANSFORM_X="${SUBTITLE_TRANSFORM_X:-0.0}"
+SUBTITLE_TRANSFORM_Y="${SUBTITLE_TRANSFORM_Y:--0.82}"
+SUBTITLE_SCALE_X="${SUBTITLE_SCALE_X:-1.0}"
+SUBTITLE_SCALE_Y="${SUBTITLE_SCALE_Y:-1.0}"
+SUBTITLE_ROTATION="${SUBTITLE_ROTATION:-0.0}"
+
+if [[ "$SUBTITLE_PRESET" == "circuit_electric" ]]; then
+  SUBTITLE_FONT_SIZE="${SUBTITLE_FONT_SIZE:-10.0}"
+  SUBTITLE_FONT_COLOR="${SUBTITLE_FONT_COLOR:-#FFFFFF}"
+  SUBTITLE_BORDER_COLOR="${SUBTITLE_BORDER_COLOR:-#000000}"
+  SUBTITLE_BORDER_WIDTH="${SUBTITLE_BORDER_WIDTH:-0.08}"
+  SUBTITLE_BORDER_ALPHA="${SUBTITLE_BORDER_ALPHA:-1.0}"
+  SUBTITLE_BACKGROUND_COLOR="${SUBTITLE_BACKGROUND_COLOR:-#000000}"
+  SUBTITLE_BACKGROUND_STYLE="${SUBTITLE_BACKGROUND_STYLE:-1}"
+  SUBTITLE_BACKGROUND_ALPHA="${SUBTITLE_BACKGROUND_ALPHA:-1.0}"
+  SUBTITLE_TRANSFORM_Y="${SUBTITLE_TRANSFORM_Y:--0.82}"
+  SUBTITLE_VERTICAL="${SUBTITLE_VERTICAL:-false}"
+fi
 
 mkdir -p "$VIDEO_DIR"
 
@@ -33,6 +73,33 @@ echo
 echo "Using CapCut draft root:"
 echo "$CAPCUT_DRAFT_ROOT"
 echo
+echo "Using captions file:"
+echo "$CAPTIONS_SRT_PATH"
+echo
+
+if [[ "$AUTO_CAPTIONS" == "true" ]]; then
+  echo "Step 0: generate captions with the OpenAI SDK"
+  transcribe_cmd=(
+    python3
+    "$SCRIPT_DIR/generate_srt_with_openai.py"
+    --output
+    "$CAPTIONS_SRT_PATH"
+    --model
+    "$OPENAI_TRANSCRIBE_MODEL"
+  )
+
+  if [[ -n "$OPENAI_TRANSCRIBE_LANGUAGE" ]]; then
+    transcribe_cmd+=(--language "$OPENAI_TRANSCRIBE_LANGUAGE")
+  fi
+
+  if [[ -n "$OPENAI_TRANSCRIBE_PROMPT" ]]; then
+    transcribe_cmd+=(--prompt "$OPENAI_TRANSCRIBE_PROMPT")
+  fi
+
+  transcribe_cmd+=("${video_files[@]}")
+  "${transcribe_cmd[@]}"
+  echo
+fi
 
 echo "Step 1: create a new draft"
 create_response=$(curl -s -X POST "${SERVER_URL}/create_draft" \
@@ -92,7 +159,51 @@ print(json.dumps({
   echo
 done
 
-echo "Step 3: save the draft into CapCut's local drafts directory"
+if [[ -f "$CAPTIONS_SRT_PATH" ]]; then
+  echo "Step 3: add subtitles from SRT"
+  subtitle_response=$(curl -s -X POST "${SERVER_URL}/add_subtitle" \
+    -H 'Content-Type: application/json' \
+    -d "$(python3 -c '
+import json, sys
+payload = {
+    "draft_id": sys.argv[1],
+    "srt": sys.argv[2],
+    "track_name": sys.argv[3],
+    "font_size": float(sys.argv[4]),
+    "bold": sys.argv[5].lower() == "true",
+    "italic": sys.argv[6].lower() == "true",
+    "underline": sys.argv[7].lower() == "true",
+    "font_color": sys.argv[8],
+    "alpha": float(sys.argv[9]),
+    "vertical": sys.argv[10].lower() == "true",
+    "border_color": sys.argv[11],
+    "border_width": float(sys.argv[12]),
+    "border_alpha": float(sys.argv[13]),
+    "background_color": sys.argv[14],
+    "background_style": int(sys.argv[15]),
+    "background_alpha": float(sys.argv[16]),
+    "transform_x": float(sys.argv[17]),
+    "transform_y": float(sys.argv[18]),
+    "scale_x": float(sys.argv[19]),
+    "scale_y": float(sys.argv[20]),
+    "rotation": float(sys.argv[21]),
+    "width": 1080,
+    "height": 1920,
+}
+if sys.argv[22]:
+    payload["font"] = sys.argv[22]
+print(json.dumps(payload))
+' "$draft_id" "$CAPTIONS_SRT_PATH" "$SUBTITLE_TRACK_NAME" "$SUBTITLE_FONT_SIZE" "$SUBTITLE_BOLD" "$SUBTITLE_ITALIC" "$SUBTITLE_UNDERLINE" "$SUBTITLE_FONT_COLOR" "$SUBTITLE_ALPHA" "$SUBTITLE_VERTICAL" "$SUBTITLE_BORDER_COLOR" "$SUBTITLE_BORDER_WIDTH" "$SUBTITLE_BORDER_ALPHA" "$SUBTITLE_BACKGROUND_COLOR" "$SUBTITLE_BACKGROUND_STYLE" "$SUBTITLE_BACKGROUND_ALPHA" "$SUBTITLE_TRANSFORM_X" "$SUBTITLE_TRANSFORM_Y" "$SUBTITLE_SCALE_X" "$SUBTITLE_SCALE_Y" "$SUBTITLE_ROTATION" "$SUBTITLE_FONT")")
+
+  echo "$subtitle_response"
+  echo
+else
+  echo "Step 3: skip subtitles"
+  echo "No SRT found at: $CAPTIONS_SRT_PATH"
+  echo
+fi
+
+echo "Step 4: save the draft into CapCut's local drafts directory"
 save_response=$(curl -s -X POST "${SERVER_URL}/save_draft" \
   -H 'Content-Type: application/json' \
   -d "$(python3 -c '
@@ -108,11 +219,11 @@ echo
 
 target_draft_path="$CAPCUT_DRAFT_ROOT/$draft_id"
 
-echo "Step 4: verify the folder exists"
+echo "Step 5: verify the folder exists"
 ls -la "$target_draft_path"
 echo
 
-echo "Step 5: open the folder in Finder"
+echo "Step 6: open the folder in Finder"
 echo "open \"$target_draft_path\""
 echo
 echo "Saved draft path:"

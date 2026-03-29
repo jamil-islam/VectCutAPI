@@ -2,8 +2,7 @@ import os
 import re
 import pyJianYingDraft as draft
 import shutil
-from util import zip_draft, is_windows_path
-from oss import upload_to_oss
+from util import is_windows_path
 from typing import Dict, Literal
 from draft_cache import DRAFT_CACHE
 from save_task_cache import DRAFT_TASKS, get_task_status, update_tasks_cache, update_task_field, increment_task_field, update_task_fields, create_task
@@ -20,7 +19,7 @@ import time
 import requests # Import requests for making HTTP calls
 import logging
 # Import configuration
-from settings import IS_CAPCUT_ENV, IS_UPLOAD_DRAFT
+from settings import IS_CAPCUT_ENV
 
 # --- Get your Logger instance ---
 # The name here must match the logger name you configured in app.py
@@ -51,7 +50,7 @@ def build_asset_path(draft_folder: str, draft_id: str, asset_type: str, material
     return draft_real_path
 
 def save_draft_background(draft_id, draft_folder, task_id):
-    """Background save draft to OSS"""
+    """Create and save a draft locally."""
     try:
         # Get draft information from global cache
         if draft_id not in DRAFT_CACHE:
@@ -216,40 +215,12 @@ def save_draft_background(draft_id, draft_folder, task_id):
         script.dump(os.path.join(target_draft_path, "draft_info.json"))
         logger.info(f"Draft information has been saved to {os.path.join(target_draft_path, 'draft_info.json')}.")
 
-        draft_url = ""
-        # Only upload draft information when IS_UPLOAD_DRAFT is True
-        if IS_UPLOAD_DRAFT:
-            # Update task status - Start compressing draft
-            update_task_field(task_id, "progress", 80)
-            update_task_field(task_id, "message", "Compressing draft files")
-            logger.info(f"Task {task_id} progress 80%: Compressing draft files.")
-            
-            # Compress the entire draft directory
-            zip_path = zip_draft(draft_id)
-            logger.info(f"Draft directory {os.path.join(current_dir, draft_id)} has been compressed to {zip_path}.")
-            
-            # Update task status - Start uploading to OSS
-            update_task_field(task_id, "progress", 90)
-            update_task_field(task_id, "message", "Uploading to cloud storage")
-            logger.info(f"Task {task_id} progress 90%: Uploading to cloud storage.")
-            
-            # Upload to OSS
-            draft_url = upload_to_oss(zip_path)
-            logger.info(f"Draft archive has been uploaded to OSS, URL: {draft_url}")
-            update_task_field(task_id, "draft_url", draft_url)
-
-            # Clean up temporary files
-            if os.path.exists(os.path.join(current_dir, draft_id)):
-                shutil.rmtree(os.path.join(current_dir, draft_id))
-                logger.info(f"Cleaned up temporary draft folder: {os.path.join(current_dir, draft_id)}")
-
-    
         # Update task status - Completed
         update_task_field(task_id, "status", "completed")
         update_task_field(task_id, "progress", 100)
         update_task_field(task_id, "message", "Draft creation completed")
-        logger.info(f"Task {task_id} completed, draft URL: {draft_url}")
-        return draft_url
+        logger.info(f"Task {task_id} completed.")
+        return ""
 
     except Exception as e:
         # Update task status - Failed

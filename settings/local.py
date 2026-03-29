@@ -17,14 +17,8 @@ DRAFT_DOMAIN = "https://www.install-ai-guider.top"
 # 默认预览路由
 PREVIEW_ROUTER = "/draft/downloader"
 
-# 是否上传草稿文件
-IS_UPLOAD_DRAFT = False
-
 # 端口号
 PORT = 9000
-
-OSS_CONFIG = []
-MP4_OSS_CONFIG=[]
 
 # 尝试加载本地配置文件
 if os.path.exists(CONFIG_FILE_PATH):
@@ -48,18 +42,6 @@ if os.path.exists(CONFIG_FILE_PATH):
             # 更新预览路由
             if "preview_router" in local_config:
                 PREVIEW_ROUTER = local_config["preview_router"]
-            
-            # 更新是否上传草稿文件
-            if "is_upload_draft" in local_config:
-                IS_UPLOAD_DRAFT = local_config["is_upload_draft"]
-                
-            # 更新OSS配置
-            if "oss_config" in local_config:
-                OSS_CONFIG = local_config["oss_config"]
-            
-            # 更新MP4 OSS配置
-            if "mp4_oss_config" in local_config:
-                MP4_OSS_CONFIG = local_config["mp4_oss_config"]
 
     except Exception as e:
         # 配置文件加载失败，使用默认配置

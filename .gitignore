@@ -21,3 +21,6 @@ notes.md
 
 scripts/videos/*
 !scripts/videos/.gitkeep
+scripts/captions.srt
+capcut_drafts
+proxyman_dumps

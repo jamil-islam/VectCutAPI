@@ -3,7 +3,7 @@ import re
 import pyJianYingDraft as draft
 import shutil
 from util import is_windows_path
-from typing import Dict, Literal
+from typing import Dict, Literal, Optional
 from draft_cache import DRAFT_CACHE
 from save_task_cache import DRAFT_TASKS, get_task_status, update_tasks_cache, update_task_field, increment_task_field, update_task_fields, create_task
 from downloader import download_audio, download_file, download_image, download_video
@@ -28,28 +28,43 @@ logger = logging.getLogger('flask_video_generator')
 # Define task status enumeration type
 TaskStatus = Literal["initialized", "processing", "completed", "failed", "not_found"]
 
-def build_asset_path(draft_folder: str, draft_id: str, asset_type: str, material_name: str) -> str:
+def sanitize_draft_folder_name(draft_name: Optional[str]) -> Optional[str]:
+    """Normalize a user-provided draft folder name into a safe single path segment."""
+    if draft_name is None:
+        return None
+
+    sanitized = draft_name.strip()
+    if not sanitized:
+        return None
+
+    sanitized = re.sub(r'[\\/]+', '_', sanitized)
+    sanitized = re.sub(r'[\x00-\x1f]+', '', sanitized)
+    sanitized = sanitized.rstrip(' .')
+
+    return sanitized or None
+
+def build_asset_path(draft_folder: str, draft_dir_name: str, asset_type: str, material_name: str) -> str:
     """
     Build asset file path
     :param draft_folder: Draft folder path
-    :param draft_id: Draft ID
+    :param draft_dir_name: Draft directory name
     :param asset_type: Asset type (audio, image, video)
     :param material_name: Material name
     :return: Built path
     """
     if is_windows_path(draft_folder):
         if os.name == 'nt': # 'nt' for Windows
-            draft_real_path = os.path.join(draft_folder, draft_id, "assets", asset_type, material_name)
+            draft_real_path = os.path.join(draft_folder, draft_dir_name, "assets", asset_type, material_name)
         else:
             windows_drive, windows_path = re.match(r'([a-zA-Z]:)(.*)', draft_folder).groups()
             parts = [p for p in windows_path.split('\\') if p]
-            draft_real_path = os.path.join(windows_drive, *parts, draft_id, "assets", asset_type, material_name)
+            draft_real_path = os.path.join(windows_drive, *parts, draft_dir_name, "assets", asset_type, material_name)
             draft_real_path = draft_real_path.replace('/', '\\')
     else:
-        draft_real_path = os.path.join(draft_folder, draft_id, "assets", asset_type, material_name)
+        draft_real_path = os.path.join(draft_folder, draft_dir_name, "assets", asset_type, material_name)
     return draft_real_path
 
-def save_draft_background(draft_id, draft_folder, task_id):
+def save_draft_background(draft_id, draft_folder, draft_name, task_id):
     """Create and save a draft locally."""
     try:
         # Get draft information from global cache
@@ -84,7 +99,8 @@ def save_draft_background(draft_id, draft_folder, task_id):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         template_dir = "template" if IS_CAPCUT_ENV else "template_jianying"
         output_root = draft_folder or current_dir
-        target_draft_path = os.path.join(output_root, draft_id)
+        draft_dir_name = sanitize_draft_folder_name(draft_name) or draft_id
+        target_draft_path = os.path.join(output_root, draft_dir_name)
 
         os.makedirs(output_root, exist_ok=True)
 
@@ -111,7 +127,7 @@ def save_draft_background(draft_id, draft_folder, task_id):
                 material_name = audio.material_name
                 # Use helper function to build path
                 if draft_folder:
-                    audio.replace_path = build_asset_path(draft_folder, draft_id, "audio", material_name)
+                    audio.replace_path = build_asset_path(draft_folder, draft_dir_name, "audio", material_name)
                 if not remote_url:
                     logger.warning(f"Audio file {material_name} has no remote_url, skipping download.")
                     continue
@@ -134,7 +150,7 @@ def save_draft_background(draft_id, draft_folder, task_id):
                 if video.material_type == 'photo':
                     # Use helper function to build path
                     if draft_folder:
-                        video.replace_path = build_asset_path(draft_folder, draft_id, "image", material_name)
+                        video.replace_path = build_asset_path(draft_folder, draft_dir_name, "image", material_name)
                     if not remote_url:
                         logger.warning(f"Image file {material_name} has no remote_url, skipping download.")
                         continue
@@ -150,7 +166,7 @@ def save_draft_background(draft_id, draft_folder, task_id):
                 elif video.material_type == 'video':
                     # Use helper function to build path
                     if draft_folder:
-                        video.replace_path = build_asset_path(draft_folder, draft_id, "video", material_name)
+                        video.replace_path = build_asset_path(draft_folder, draft_dir_name, "video", material_name)
                     if not remote_url:
                         logger.warning(f"Video file {material_name} has no remote_url, skipping download.")
                         continue
@@ -212,6 +228,7 @@ def save_draft_background(draft_id, draft_folder, task_id):
         update_task_field(task_id, "message", "Saving draft information")
         logger.info(f"Task {task_id} progress 70%: Saving draft information.")
         
+        script.content["name"] = draft_dir_name
         script.dump(os.path.join(target_draft_path, "draft_info.json"))
         logger.info(f"Draft information has been saved to {os.path.join(target_draft_path, 'draft_info.json')}.")
 
@@ -233,9 +250,9 @@ def save_draft_background(draft_id, draft_folder, task_id):
 def query_task_status(task_id: str):
     return get_task_status(task_id)
 
-def save_draft_impl(draft_id: str, draft_folder: str = None) -> Dict[str, str]:
+def save_draft_impl(draft_id: str, draft_folder: str = None, draft_name: str = None) -> Dict[str, str]:
     """Start a background task to save the draft"""
-    logger.info(f"Received save draft request: draft_id={draft_id}, draft_folder={draft_folder}")
+    logger.info(f"Received save draft request: draft_id={draft_id}, draft_folder={draft_folder}, draft_name={draft_name}")
     try:
         # Generate a unique task ID
         task_id = draft_id
@@ -245,7 +262,7 @@ def save_draft_impl(draft_id: str, draft_folder: str = None) -> Dict[str, str]:
         # Changed to synchronous execution
         return {
             "success": True,
-            "draft_url": save_draft_background(draft_id, draft_folder, task_id)
+            "draft_url": save_draft_background(draft_id, draft_folder, draft_name, task_id)
             }
 
         # # Start a background thread to execute the task

@@ -8,6 +8,7 @@ VIDEO_DIR="${VIDEO_DIR:-$SCRIPT_DIR/videos}"
 CAPTIONS_SRT_PATH="${CAPTIONS_SRT_PATH:-$SCRIPT_DIR/captions.srt}"
 USER_HOME="${HOME:-$(python3 -c 'from pathlib import Path; print(Path.home())')}"
 CAPCUT_DRAFT_ROOT="${CAPCUT_DRAFT_ROOT:-$USER_HOME/Movies/CapCut/User Data/Projects/com.lveditor.draft}"
+DRAFT_NAME="${DRAFT_NAME:-${1:-}}"
 TRACK_NAME="${TRACK_NAME:-video_main}"
 AUTO_CAPTIONS="${AUTO_CAPTIONS:-false}"
 OPENAI_TRANSCRIBE_MODEL="${OPENAI_TRANSCRIBE_MODEL:-whisper-1}"
@@ -73,6 +74,11 @@ echo
 echo "Using CapCut draft root:"
 echo "$CAPCUT_DRAFT_ROOT"
 echo
+if [[ -n "$DRAFT_NAME" ]]; then
+  echo "Using draft folder name:"
+  echo "$DRAFT_NAME"
+  echo
+fi
 echo "Using captions file:"
 echo "$CAPTIONS_SRT_PATH"
 echo
@@ -211,13 +217,29 @@ import json, sys
 print(json.dumps({
     "draft_id": sys.argv[1],
     "draft_folder": sys.argv[2],
+    "draft_name": sys.argv[3] or None,
 }))
-' "$draft_id" "$CAPCUT_DRAFT_ROOT")")
+' "$draft_id" "$CAPCUT_DRAFT_ROOT" "$DRAFT_NAME")")
 
 echo "$save_response"
 echo
 
-target_draft_path="$CAPCUT_DRAFT_ROOT/$draft_id"
+target_draft_dir_name="$draft_id"
+if [[ -n "$DRAFT_NAME" ]]; then
+  target_draft_dir_name="$(python3 -c '
+import re, sys
+name = sys.argv[1].strip()
+name = re.sub(r"[\\\\/]+", "_", name)
+name = re.sub(r"[\x00-\x1f]+", "", name)
+name = name.rstrip(" .")
+print(name)
+' "$DRAFT_NAME")"
+  if [[ -z "$target_draft_dir_name" ]]; then
+    target_draft_dir_name="$draft_id"
+  fi
+fi
+
+target_draft_path="$CAPCUT_DRAFT_ROOT/$target_draft_dir_name"
 
 echo "Step 5: verify the folder exists"
 ls -la "$target_draft_path"

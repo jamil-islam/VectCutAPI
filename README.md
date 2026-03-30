@@ -1,294 +1,320 @@
+# VectCutAPI Fork for CapCut Draft Generation
 
-# Connect AI generates via VectCutAPI [Try it online](https://www.vectcut.com)
+This repository is a fork of the open source [VectCutAPI](https://github.com/sun-guannan/VectCutAPI). This fork is maintained as a CapCut-focused variant for creating and saving local CapCut draft projects through a Python HTTP API and shell scripts.
 
-## Preview
+## Fork Scope
 
-**VectCut** is a **toA (toAgent)** video editing tool. It provides a rich set of cloud-based editing APIs and Skills, including features such as adding subtitles, illustrations, picture-in-picture (PiP), AI voiceovers, filters, and more.
+This fork is intentionally narrower than the upstream project.
 
-You can integrate our editing tools into any Agent-based environment, whether it’s a manually orchestrated workflow platform (such as **Coze, Dify, or N8N**) or an autonomous planning platform (such as **OpenClaw, Claude Code, or Trae**). This enables you to meet your needs for automated and bulk video production.
+- CapCut is the only supported desktop editor documented here.
+- The documented interface is the local HTTP API exposed by `capcut_server.py`.
+- The README focuses on local draft generation, subtitle import, and scripted draft assembly.
 
-We have open-sourced our interface code on GitHub, making it easy for various AI models to train on and learn our interfaces. Instead of fine-tuning models yourself, you can let the AI actively learn our API (feel free to give us a star to help AI index it even faster! 🤩).
+## What This Fork Does
 
-Enjoy It!  😀😀😀
+This project lets you build CapCut drafts programmatically, then save those drafts into CapCut's local projects directory so they appear in the desktop app.
 
-[中文说明](README-zh.md) 
+Core capabilities in this fork include:
 
-### Advantages
+- Create a new draft timeline
+- Add video clips in sequence
+- Add audio tracks
+- Add subtitles from SRT
+- Add text, images, stickers, effects, and keyframes
+- Save the assembled project as a local CapCut draft
 
-1. **API-Powered Editing:** Access all powerfull editing features, including multi-track editing and keyframe animation, through a powerful API.
+## Repository Layout
 
-2. **Real-Time Cloud Preview:** Instantly preview your edits on a webpage without downloads, dramatically improving your workflow.
+- `capcut_server.py`: Flask server that exposes the local HTTP API
+- `config.json.example`: Example configuration for local setup
+- `scripts/create_capcut_draft_from_videos.sh`: End-to-end script that assembles a CapCut draft from local video files
+- `scripts/generate_srt_with_openai.py`: Optional helper that generates SRT captions with the OpenAI API
+- `scripts/videos/`: Default input directory for the draft creation script
 
-3. **Flexible Local Editing:** Export projects as drafts to import into CapCut or Jianying for further refinement.
+## Requirements
 
-4. **Automated Cloud Generation:** Use the API to render and generate final videos directly in the cloud.
+- Python 3.10 or newer
+- `ffmpeg`
+- `ffprobe`
+- CapCut desktop installed on the machine where drafts will be saved
 
-## Demos
+Notes:
 
-<div align="center">
+- `ffprobe` is required because the draft creation script reads each clip's duration before adding it to the timeline.
+- If you want automatic captions, you also need an OpenAI API key.
 
-**MCP, create your own editing Agent**
-
-[![AI Cut](https://img.youtube.com/vi/fBqy6WFC78E/hqdefault.jpg)](https://www.youtube.com/watch?v=fBqy6WFC78E)
-
-**Combine AI-generated images and videos using VectCutAPI**
-
-[More](pattern)
-
-[![Airbnb](https://img.youtube.com/vi/1zmQWt13Dx0/hqdefault.jpg)](https://www.youtube.com/watch?v=1zmQWt13Dx0)
-
-[![Horse](https://img.youtube.com/vi/IF1RDFGOtEU/hqdefault.jpg)](https://www.youtube.com/watch?v=IF1RDFGOtEU)
-
-[![Song](https://img.youtube.com/vi/rGNLE_slAJ8/hqdefault.jpg)](https://www.youtube.com/watch?v=rGNLE_slAJ8)
-
-
-</div>
-
-## Key Features
-
-| Feature Module | API | MCP Protocol | Description |
-|---------|----------|----------|------|
-| **Draft Management** | ✅ | ✅ | Create and save Jianying/CapCut draft files |
-| **Video Processing** | ✅ | ✅ | Import, clip, transition, and apply effects to multiple video formats |
-| **Audio Editing** | ✅ | ✅ | Audio tracks, volume control, sound effects processing |
-| **Image Processing** | ✅ | ✅ | Image import, animation, masks, filters |
-| **Text Editing** | ✅ | ✅ | Multi-style text, shadows, backgrounds, animations |
-| **Subtitle System** | ✅ | ✅ | SRT subtitle import, style settings, time synchronization |
-| **Effects Engine** | ✅ | ✅ | Visual effects, filters, transition animations |
-| **Sticker System** | ✅ | ✅ | Sticker assets, position control, animation effects |
-| **Keyframes** | ✅ | ✅ | Property animation, timeline control, easing functions |
-| **Media Analysis** | ✅ | ✅ | Get video duration, detect format |
-
-## Quick Start
-
-### 1\. System Requirements
-
-  - Python 3.10+
-  - Jianying or CapCut International version
-  - FFmpeg
-
-### 2\. Installation and Deployment
+## Installation
 
 ```bash
-# 1. Clone the project
-git clone https://github.com/sun-guannan/VectCutAPI.git
+git clone https://github.com/jamil-islam/VectCutAPI.git
 cd VectCutAPI
 
-# 2. Create a virtual environment (recommended)
-python -m venv venv-capcut
-source venv-capcut/bin/activate  # Linux/macOS
-# or venv-capcut\Scripts\activate  # Windows
+python3 -m venv .venv
+source .venv/bin/activate
 
-# 3. Install dependencies
-pip install -r requirements.txt      # HTTP API basic dependencies
-pip install -r requirements-mcp.txt  # MCP protocol support (optional)
+pip install -r requirements.txt
+```
 
-# 4. Configuration file
+## Configuration
+
+Create a local config file:
+
+```bash
 cp config.json.example config.json
-# Edit config.json as needed
 ```
 
-### 3\. Start the service
+The example config includes:
+
+- `is_capcut_env`: should remain `true` for this fork
+- `draft_domain`: base domain used for generated draft URLs
+- `port`: local Flask server port
+- `preview_router`: route used when building draft preview URLs
+- `openai_api_key`: optional, used by `scripts/generate_srt_with_openai.py`
+
+If you do not want to store the OpenAI key in `config.json`, you can instead export `OPENAI_API_KEY` in your shell.
+
+## Start The Local API Server
 
 ```bash
-python capcut_server.py # Start the HTTP API server, default port: 9001
-
-python mcp_server.py # Start the MCP protocol service, supports stdio communication
-```
-## Skill Integration Guide
-[Skill中文文档](https://github.com/sun-guannan/VectCutAPI/blob/main/vectcut-skill/README.md)
-[Skill Guide](https://github.com/sun-guannan/VectCutAPI/blob/main/vectcut-skill/README_EN.md)
-
-## MCP Integration Guide
-
-[MCP 中文文档](https://www.google.com/search?q=./MCP_%E6%96%87%E6%A1%A3_%E4%B8%AD%E6%96%87.md) • [MCP English Guide](https://www.google.com/search?q=./MCP_Documentation_English.md)
-
-### 1\. Client Configuration
-
-Create or update the `mcp_config.json` configuration file:
-
-```json
-{
-  "mcpServers": {
-    "capcut-api": {
-      "command": "python3",
-      "args": ["mcp_server.py"],
-      "cwd": "/path/to/CapCutAPI",
-      "env": {
-        "PYTHONPATH": "/path/to/CapCutAPI",
-        "DEBUG": "0"
-      }
-    }
-  }
-}
+python3 capcut_server.py
 ```
 
-### 2\. Connection Test
+By default the server runs on port `9001`.
+
+## Basic Smoke Test
+
+Create a draft:
 
 ```bash
-# Test MCP connection
-python test_mcp_client.py
-
-# Expected output
-✅ MCP server started successfully
-✅ Got 11 available tools
-✅ Draft creation test passed
+curl -s -X POST http://localhost:9001/create_draft \
+  -H 'Content-Type: application/json' \
+  -d '{"width":1080,"height":1920}'
 ```
 
-## Usage Examples
+You should receive a JSON response containing a `draft_id`.
 
-### 1\. API Example
+## Core HTTP Endpoints
 
-Add video material
+The main endpoints exposed by `capcut_server.py` include:
+
+- `POST /create_draft`
+- `POST /add_video`
+- `POST /add_audio`
+- `POST /add_subtitle`
+- `POST /add_text`
+- `POST /add_image`
+- `POST /add_sticker`
+- `POST /add_effect`
+- `POST /add_video_keyframe`
+- `POST /save_draft`
+- `POST /query_draft_status`
+- `POST /query_script`
+- `POST /generate_draft_url`
+
+There are also multiple metadata endpoints for fonts, transitions, masks, text animations, audio effects, and video effects.
+
+## Quick API Example
+
+Create a draft:
 
 ```python
 import requests
 
-# Add background video
-response = requests.post("http://localhost:9001/add_video", json={
-    "video_url": "https://example.com/background.mp4",
-    "start": 0,
-    "end": 10
-    "volume": 0.8,
-    "transition": "fade_in"
-})
+create_response = requests.post(
+    "http://localhost:9001/create_draft",
+    json={"width": 1080, "height": 1920},
+)
+create_response.raise_for_status()
 
-print(f"Video addition result: {response.json()}")
+draft_id = create_response.json()["output"]["draft_id"]
+print(draft_id)
 ```
 
-Create stylized text
+Add a video clip:
 
 ```python
 import requests
 
-# Add title text
-response = requests.post("http://localhost:9001/add_text", json={
-    "text": "Welcome to VectCutAPI",
-    "start": 0,
-    "end": 5,
-    "font": "Source Han Sans",read
-    "font_color": "#FFD700",
-    "font_size": 48,
-    "shadow_enabled": True,
-    "background_color": "#000000"
-})
-
-print(f"Text addition result: {response.json()}")
+response = requests.post(
+    "http://localhost:9001/add_video",
+    json={
+        "draft_id": "your-draft-id",
+        "video_url": "/absolute/path/to/clip.mp4",
+        "target_start": 0,
+        "duration": 5.0,
+        "track_name": "video_main",
+    },
+)
+response.raise_for_status()
+print(response.json())
 ```
 
-More examples can be found in the `example.py` file.
-
-### 2\. MCP Protocol Example
-
-Complete workflow
+Save the draft:
 
 ```python
-# 1. Create a new project
-draft = mcp_client.call_tool("create_draft", {
-    "width": 1080,
-    "height": 1920
-})
-draft_id = draft["result"]["draft_id"]
+import requests
 
-# 2. Add background video
-mcp_client.call_tool("add_video", {
-    "video_url": "https://example.com/bg.mp4",
-    "draft_id": draft_id,
-    "start": 0,
-    "end": 10,
-    "volume": 0.6
-})
-
-# 3. Add title text
-mcp_client.call_tool("add_text", {
-    "text": "AI-Driven Video Production",
-    "draft_id": draft_id,
-    "start": 1,
-    "end": 6,
-    "font_size": 56,
-    "shadow_enabled": True,
-    "background_color": "#1E1E1E"
-})
-
-# 4. Add keyframe animation
-mcp_client.call_tool("add_video_keyframe", {
-    "draft_id": draft_id,
-    "track_name": "main",
-    "property_types": ["scale_x", "scale_y", "alpha"],
-    "times": [0, 2, 4],
-    "values": ["1.0", "1.2", "0.8"]
-})
-
-# 5. Save the project
-result = mcp_client.call_tool("save_draft", {
-    "draft_id": draft_id
-})
-
-print(f"Project saved: {result['result']['draft_url']}")
+response = requests.post(
+    "http://localhost:9001/save_draft",
+    json={
+        "draft_id": "your-draft-id",
+        "draft_folder": "/Users/your-user/Movies/CapCut/User Data/Projects/com.lveditor.draft",
+        "draft_name": "example-project",
+    },
+)
+response.raise_for_status()
+print(response.json())
 ```
 
-Advanced text effects
+## End-To-End Script: `scripts/create_capcut_draft_from_videos.sh`
 
-```python
-# Multi-style colored text
-mcp_client.call_tool("add_text", {
-    "text": "Colored text effect demonstration",
-    "draft_id": draft_id,
-    "start": 2,
-    "end": 8,
-    "font_size": 42,
-    "shadow_enabled": True,
-    "shadow_color": "#FFFFFF",
-    "background_alpha": 0.8,
-    "background_round_radius": 20,
-    "text_styles": [
-        {"start": 0, "end": 2, "font_color": "#FF6B6B"},
-        {"start": 2, "end": 4, "font_color": "#4ECDC4"},
-        {"start": 4, "end": 6, "font_color": "#45B7D1"}
-    ]
-})
+This script is the simplest complete workflow in the repo for turning a set of local clips into a CapCut draft.
+
+### What The Script Does
+
+The script:
+
+1. Scans a local video directory for supported files
+2. Creates a new draft through `POST /create_draft`
+3. Adds each clip sequentially through `POST /add_video`
+4. Optionally adds subtitles through `POST /add_subtitle`
+5. Saves the result into CapCut's local draft directory through `POST /save_draft`
+6. Prints the final draft path so you can open it in Finder
+
+Supported file extensions are:
+
+- `mp4`
+- `mov`
+- `m4v`
+- `mkv`
+- `avi`
+- `webm`
+
+### Default Paths
+
+By default the script uses:
+
+- Video input directory: `scripts/videos`
+- Subtitle file: `scripts/captions.srt`
+- CapCut draft root: `~/Movies/CapCut/User Data/Projects/com.lveditor.draft`
+- Server URL: `http://localhost:9001`
+
+### Typical Usage
+
+Start the API server in one terminal:
+
+```bash
+python3 capcut_server.py
 ```
 
-### 3\. Downloading Drafts
+In another terminal, activate your virtualenv if needed, place clips into `scripts/videos`, then run:
 
-Calling `save_draft` will generate a folder starting with `dfd_` in the current directory of `capcut_server.py`. Copy this to the CapCut/Jianying drafts directory to see the generated draft in the application.
+```bash
+./scripts/create_capcut_draft_from_videos.sh
+```
 
-## Pattern
+### What Happens At Runtime
 
-You can find a lot of pattern in the `pattern` directory.
+- The script creates `scripts/videos` if it does not already exist.
+- It fails immediately if no supported video files are found.
+- It uses `ffprobe` to calculate each clip's duration.
+- It appends clips in order by increasing timeline start time.
+- If `scripts/captions.srt` exists, it imports that file as subtitles.
+- If a custom `DRAFT_NAME` is provided, the script sanitizes it before creating the final folder name.
 
-## Community & Support
+### Optional Automatic Captions
 
-We welcome contributions of all forms\! Our iteration rules are:
+If you want the script to generate captions before building the draft, set:
 
-  - No direct PRs to main
-  - PRs can be submitted to the dev branch
-  - Merges from dev to main and releases will happen every Monday
+```bash
+AUTO_CAPTIONS=true ./scripts/create_capcut_draft_from_videos.sh
+```
 
-## Contact Us
+When `AUTO_CAPTIONS=true`, the script runs `scripts/generate_srt_with_openai.py` before creating the draft. That helper:
 
-### 🤝 Collaboration
+- extracts audio from each clip with `ffmpeg`
+- sends audio to the OpenAI transcription API
+- combines the resulting segments into one timeline-aligned SRT file
+- writes the final SRT to `CAPTIONS_SRT_PATH`
 
-  - **Video Production**: Want to use this API for batch production of videos with AIGC? 
+You must provide an API key through either:
 
-  - **Join us**: Our goal is to provide a stable and reliable video editing tool that integrates well with AI-generated images, videos, and audio. If you are interested, submit a PR and I'll see it. For more in-depth involvement, the code for the MCP Editing Agent, web-based editing client, and cloud rendering modules has not been open-sourced yet.
+- `OPENAI_API_KEY`
+- `openai_api_key` in `config.json`
 
-**Contact**: abelchrisnic@gmail.com
+### Useful Environment Variables
 
-## 📈 Star History
+You can customize the script without editing it by setting environment variables before running it.
 
-<div align="center">
+General workflow variables:
 
-[![Star History Chart](https://api.star-history.com/svg?repos=sun-guannan/CapCutAPI&type=Date)](https://www.star-history.com/#sun-guannan/CapCutAPI&Date)
+- `SERVER_URL`: API base URL, default `http://localhost:9001`
+- `VIDEO_DIR`: input clip directory, default `scripts/videos`
+- `CAPTIONS_SRT_PATH`: subtitle file path, default `scripts/captions.srt`
+- `CAPCUT_DRAFT_ROOT`: destination CapCut drafts directory
+- `DRAFT_NAME`: optional final draft folder name
+- `TRACK_NAME`: video track name, default `video_main`
+- `AUTO_CAPTIONS`: `true` or `false`
+- `OPENAI_TRANSCRIBE_MODEL`: default `whisper-1`
+- `OPENAI_TRANSCRIBE_LANGUAGE`: optional language hint such as `en`
+- `OPENAI_TRANSCRIBE_PROMPT`: optional transcription prompt
+- `SUBTITLE_TRACK_NAME`: subtitle track name, default `subtitle`
+- `SUBTITLE_PRESET`: subtitle preset selector, default `circuit_electric`
 
-![GitHub repo size](https://img.shields.io/github/repo-size/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub code size](https://img.shields.io/github/languages/code-size/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub issues](https://img.shields.io/github/issues/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/sun-guannan/CapCutAPI?style=flat-square)
-![GitHub last commit](https://img.shields.io/github/last-commit/sun-guannan/CapCutAPI?style=flat-square)
+Subtitle styling variables:
 
+- `SUBTITLE_FONT`
+- `SUBTITLE_FONT_SIZE`
+- `SUBTITLE_BOLD`
+- `SUBTITLE_ITALIC`
+- `SUBTITLE_UNDERLINE`
+- `SUBTITLE_FONT_COLOR`
+- `SUBTITLE_ALPHA`
+- `SUBTITLE_VERTICAL`
+- `SUBTITLE_BORDER_COLOR`
+- `SUBTITLE_BORDER_WIDTH`
+- `SUBTITLE_BORDER_ALPHA`
+- `SUBTITLE_BACKGROUND_COLOR`
+- `SUBTITLE_BACKGROUND_STYLE`
+- `SUBTITLE_BACKGROUND_ALPHA`
+- `SUBTITLE_TRANSFORM_X`
+- `SUBTITLE_TRANSFORM_Y`
+- `SUBTITLE_SCALE_X`
+- `SUBTITLE_SCALE_Y`
+- `SUBTITLE_ROTATION`
 
-[![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/69c38d28-a97c-4397-849d-c3e3d241b800)
-</div>
+### Example Custom Run
 
-*Made with ❤️ by the CapCutAPI Community*
+```bash
+DRAFT_NAME="launch-cut" \
+VIDEO_DIR="$PWD/my_clips" \
+CAPTIONS_SRT_PATH="$PWD/my_captions.srt" \
+SUBTITLE_FONT_SIZE="12.0" \
+SUBTITLE_TRANSFORM_Y="-0.78" \
+./scripts/create_capcut_draft_from_videos.sh
+```
+
+### Expected Result
+
+On success, the script prints the final saved draft path under CapCut's local projects directory. That draft should then appear in the CapCut desktop application.
+
+## Troubleshooting
+
+If draft creation fails:
+
+- confirm `python3 capcut_server.py` is running
+- confirm the server is reachable at `SERVER_URL`
+- confirm `ffmpeg` and `ffprobe` are installed and available on `PATH`
+- confirm CapCut is installed and `CAPCUT_DRAFT_ROOT` points to the correct local drafts directory
+- confirm your clip paths are valid and readable
+
+If auto captions fail:
+
+- confirm `OPENAI_API_KEY` is set or `config.json` contains `openai_api_key`
+- confirm the transcoded audio for each clip stays under the OpenAI upload size limit enforced by `scripts/generate_srt_with_openai.py`
+
+## Upstream
+
+This repository is based on the open source VectCutAPI project. If you need features or documentation that are not present in this fork, check the upstream repository:
+
+`https://github.com/sun-guannan/VectCutAPI`

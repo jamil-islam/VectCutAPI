@@ -733,6 +733,7 @@ def save_draft():
     # Get required parameters
     draft_id = data.get('draft_id')
     draft_folder = data.get('draft_folder')  # Draft folder parameter
+    draft_name = data.get('draft_name')
     
     result = {
         "success": False,
@@ -748,7 +749,7 @@ def save_draft():
     
     try:
         # Call save_draft_impl method, start background task
-        draft_result = save_draft_impl(draft_id, draft_folder)
+        draft_result = save_draft_impl(draft_id, draft_folder, draft_name)
         
         result["success"] = True
         result["output"] = draft_result
